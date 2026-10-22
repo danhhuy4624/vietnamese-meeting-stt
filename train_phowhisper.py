@@ -1,14 +1,14 @@
 import re
 import unicodedata
-import evaluate
-import torch
 from dataclasses import dataclass
+
+import evaluate
 from datasets import Audio, load_dataset
 from transformers import (
-    WhisperForConditionalGeneration,
-    WhisperProcessor,
     Seq2SeqTrainer,
     Seq2SeqTrainingArguments,
+    WhisperForConditionalGeneration,
+    WhisperProcessor,
 )
 
 MODEL_ID = "vinai/PhoWhisper-small"
@@ -31,9 +31,11 @@ model.generation_config.forced_decoder_ids = None
 model.generation_config.suppress_tokens = []
 model.config.use_cache = False
 
+
 def clean_text(text):
     text = unicodedata.normalize("NFC", text)
     return re.sub(r"\s+", " ", text).strip()
+
 
 def prepare(example):
     audio = example["audio"]
@@ -45,11 +47,14 @@ def prepare(example):
     example["labels"] = processor.tokenizer(clean_text(example["sentence"])).input_ids
     return example
 
+
 ds = ds.map(
     prepare,
     remove_columns=ds["train"].column_names,
     num_proc=4,
 )
+
+
 @dataclass
 class DataCollatorSpeechSeq2Seq:
     processor: WhisperProcessor
@@ -83,7 +88,9 @@ class DataCollatorSpeechSeq2Seq:
         batch["labels"] = labels
         return batch
 
+
 wer = evaluate.load("wer")
+
 
 def compute_metrics(pred):
     pred_ids = pred.predictions
@@ -97,6 +104,7 @@ def compute_metrics(pred):
         label_ids, skip_special_tokens=True
     )
     return {"wer": 100 * wer.compute(predictions=predictions, references=references)}
+
 
 args = Seq2SeqTrainingArguments(
     output_dir=OUTPUT_DIR,
@@ -121,7 +129,7 @@ args = Seq2SeqTrainingArguments(
     greater_is_better=False,
     save_total_limit=2,
     report_to="none",
-    ddp_find_unused_parameters=False
+    ddp_find_unused_parameters=False,
 )
 
 trainer = Seq2SeqTrainer(
@@ -130,8 +138,9 @@ trainer = Seq2SeqTrainer(
     train_dataset=ds["train"],
     eval_dataset=ds["validation"],
     data_collator=DataCollatorSpeechSeq2Seq(
-    processor=processor,
-    decoder_start_token_id=model.config.decoder_start_token_id,),
+        processor=processor,
+        decoder_start_token_id=model.config.decoder_start_token_id,
+    ),
     compute_metrics=compute_metrics,
     processing_class=processor.feature_extractor,
 )

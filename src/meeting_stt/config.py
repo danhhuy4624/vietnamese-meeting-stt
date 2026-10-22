@@ -7,6 +7,8 @@ import torch
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .constants import WHISPER_SAMPLE_RATE
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -19,7 +21,7 @@ class Settings(BaseSettings):
     enable_classifier: bool = True
     enable_mixed_asr: bool = True
 
-    sample_rate: int = 16_000
+    sample_rate: int = WHISPER_SAMPLE_RATE
     vad_aggressiveness: int = Field(default=2, ge=0, le=3)
     min_utterance_ms: int = Field(default=400, ge=100)
     end_silence_ms: int = Field(default=700, ge=200)
@@ -37,8 +39,11 @@ class Settings(BaseSettings):
     @field_validator("sample_rate")
     @classmethod
     def validate_sample_rate(cls, value: int) -> int:
-        if value not in {8_000, 16_000, 32_000, 48_000}:
-            raise ValueError("WebRTC VAD supports 8, 16, 32, or 48 kHz")
+        if value != WHISPER_SAMPLE_RATE:
+            raise ValueError(
+                f"sample_rate must be exactly {WHISPER_SAMPLE_RATE} Hz for this ASR pipeline; "
+                "resample audio before sending it to the server."
+            )
         return value
 
     @property

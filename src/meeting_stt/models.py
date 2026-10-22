@@ -13,6 +13,7 @@ from transformers import (
     WhisperForConditionalGeneration,
 )
 
+from .constants import WHISPER_SAMPLE_RATE
 from .schemas import Classification
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,10 @@ class WhisperASR:
 
     @torch.inference_mode()
     def transcribe(self, audio: np.ndarray, sample_rate: int) -> ASRCandidate:
+        if sample_rate != WHISPER_SAMPLE_RATE:
+            raise ValueError(
+                f"Whisper ASR requires {WHISPER_SAMPLE_RATE} Hz audio, got {sample_rate} Hz."
+            )
         inputs = self.processor(
             audio,
             sampling_rate=sample_rate,
@@ -136,6 +141,11 @@ class SpeakerClassifier:
 
     @torch.inference_mode()
     def classify(self, audio: np.ndarray, sample_rate: int) -> Classification:
+        if sample_rate != WHISPER_SAMPLE_RATE:
+            raise ValueError(
+                f"Speaker classification requires {WHISPER_SAMPLE_RATE} Hz audio, "
+                f"got {sample_rate} Hz."
+            )
         inputs = self.processor(audio, sampling_rate=sample_rate, return_tensors="pt")
         features = inputs.input_features.to(self.device, dtype=self.model.dtype)
         logits = self.model(input_features=features).logits[0]
