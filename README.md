@@ -90,6 +90,7 @@ to Compose.
 | `CLASSIFIER_MODEL_ID` | requested `hr16/...-v3` | Gender/dialect acoustic tagger |
 | `VIETNAMESE_ASR_MODEL_ID` | `vinai/PhoWhisper-medium` | Primary Vietnamese ASR candidate |
 | `MIXED_ASR_MODEL_ID` | `openai/whisper-small` | English/code-switch ASR candidate |
+| `SAMPLE_RATE` | `16000` | Fixed audio rate required by Whisper |
 | `DEVICE` | `auto` | `cuda`, `mps`, or `cpu` override |
 | `VAD_AGGRESSIVENESS` | `2` | 0 accepts more sound; 3 rejects more noise |
 | `END_SILENCE_MS` | `700` | Silence that ends an utterance |
@@ -140,6 +141,35 @@ meeting room:
    classifier describes acoustic classes and cannot separate speakers.
 5. Evaluate with Vietnamese/English code-switch recordings from the target room;
    report WER separately for near/far positions and each language.
+
+## Reproducible ASR evaluation
+
+Create a UTF-8 CSV manifest with `audio_path` and `reference` columns; `id` is optional.
+Relative audio paths are resolved from the manifest directory. Each reference must
+be non-empty and correspond to the exact recording.
+
+    id,audio_path,reference
+    meeting-001,../audio/meeting-001.wav,"Chúng ta review the deployment plan."
+    meeting-002,../audio/meeting-002.wav,"Tôi sẽ gửi bản cập nhật vào ngày mai."
+
+Install development dependencies, then compare checkpoints:
+
+    pip install -e '.[dev]'
+    python scripts/compare_phowhisper.py --manifest data/eval.csv --models vinai/PhoWhisper-small ./models/PhoWhisper-small-meetings --device cuda --output evaluation-results.csv
+
+The script downmixes audio to mono, resamples it to 16 kHz, and uses chunked
+inference for recordings longer than a single Whisper window. The CSV contains
+per-recording predictions, WER/CER, edit counts, and inference time. Console
+summaries use corpus-level micro-averaged WER/CER (total errors divided by total
+reference words/characters), not an unweighted average of per-recording rates.
+
+Normalization is Unicode NFC, case-insensitive, punctuation-insensitive, and
+whitespace-normalized. Vietnamese diacritics are preserved. WER is a ratio and is
+not capped at 100%: insertions can produce more errors than reference words. Empty
+or punctuation-only references are rejected because their error rates are undefined.
+A real model benchmark still requires a manually checked reference transcript for
+each evaluation recording; this repository does not claim measured WER without that
+labeled dataset.
 
 ## Development
 
